@@ -14,6 +14,6 @@ import java.util.UUID;
 
 @Repository
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> {
-    Page<ChatMessage> findByChannelIdAndTimestampBetween(UUID channelId, Instant start, Instant end, Pageable pageable);
+    Page<ChatMessage> findByChannelIdAndCreatedAtBetween(UUID channelId, Instant start, Instant end, Pageable pageable);
 
 }

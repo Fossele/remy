@@ -21,7 +21,7 @@ public class MessageService {
     private final ChatMessageRepository chatMessageRepository;
 
      public Page<ChatMessageResponse>  getMessages(UUID channelId, Instant startTime, Instant endTime, Pageable pageable){
-        Page<ChatMessage> messages = chatMessageRepository.findByChannelIdAndTimestampBetween(channelId, startTime, endTime, pageable);
+        Page<ChatMessage> messages = chatMessageRepository.findByChannelIdAndCreatedAtBetween(channelId, startTime, endTime, pageable);
          return  messages.map(ChatMessageResponse::fromEntity);
     }
 }
