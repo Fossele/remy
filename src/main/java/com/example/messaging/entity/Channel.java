@@ -40,6 +40,15 @@ public class Channel {
     @Column(nullable = false, length = 20)
     private ChannelType type;
 
+    @Column(name = "neighborhood_id")
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    private UUID neighborhoodId;
+
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    @Column(nullable = false, length = 30)
+    private NeighborhoodChannelCategory category = NeighborhoodChannelCategory.GENERAL;
+
     @CreationTimestamp
     @Column( name = "created_at",nullable = false, updatable = false)
     private Instant createdAt;

@@ -5,7 +5,9 @@ import com.example.messaging.dto.MessageEvent;
 import com.example.messaging.dto.TypingEventPayload;
 import com.example.messaging.entity.ChatMessage;
 import com.example.messaging.repository.ChatMessageRepository;
+import com.example.messaging.service.NeighborhoodService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -22,18 +24,21 @@ import java.util.UUID;
 public class MessageController {
 
     private final ChatMessageRepository chatMessageRepository;
+    private final NeighborhoodService neighborhoodService;
 
     @MessageMapping("/chat.updateMessage/{channelId}")
     @SendTo("/topic/channel.{channelId}")
      public ChatMessageResponse updateMessage(@DestinationVariable UUID channelId,
                                               @Payload MessageEvent event,
                                               Principal principal){
+         UUID userId = currentUserId(principal);
+         neighborhoodService.requireChannelAccess(channelId, userId);
          ChatMessage chatMessage = chatMessageRepository.findById(event.messageId()).orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found"));
          authorizeMessageMutation(chatMessage, channelId, principal);
          chatMessage.setContent(event.content());
          chatMessage.setEdited(true);
-         chatMessageRepository.save(chatMessage);
-         return ChatMessageResponse.fromEntity(chatMessage);
+         ChatMessage savedMessage = chatMessageRepository.save(chatMessage);
+         return ChatMessageResponse.fromEntity(savedMessage);
      }
 
     @MessageMapping("/chat.deleteMessage/{channelId}")
@@ -41,6 +46,8 @@ public class MessageController {
     public ChatMessageResponse deleteMessage(@DestinationVariable UUID channelId,
                                               @Payload MessageEvent event,
                                               Principal principal){
+        UUID userId = currentUserId(principal);
+        neighborhoodService.requireChannelAccess(channelId, userId);
         ChatMessage chatMessage = chatMessageRepository.findById(event.messageId()).orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found"));
         authorizeMessageMutation(chatMessage, channelId, principal);
         chatMessage.setDeleted(true);
@@ -54,10 +61,12 @@ public class MessageController {
     public ChatMessageResponse sendMessage(@DestinationVariable UUID channelId,
                                             @Payload MessageEvent event,
                                             Principal principal){
+         UUID userId = currentUserId(principal);
+         neighborhoodService.requireChannelAccess(channelId, userId);
          ChatMessage chatMessage = ChatMessage.builder()
                  .content(event.content())
                  .channelId(channelId)
-                 .senderId(currentUserId(principal))
+                 .senderId(userId)
                  .build();
         chatMessageRepository.save(chatMessage);
         return ChatMessageResponse.fromEntity(chatMessage);

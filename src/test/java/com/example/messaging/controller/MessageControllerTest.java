@@ -3,6 +3,7 @@ package com.example.messaging.controller;
 import com.example.messaging.dto.MessageEvent;
 import com.example.messaging.entity.ChatMessage;
 import com.example.messaging.repository.ChatMessageRepository;
+import com.example.messaging.service.NeighborhoodService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -28,6 +29,9 @@ class MessageControllerTest {
 
     @Mock
     private Principal principal;
+
+    @Mock
+    private NeighborhoodService neighborhoodService;
 
     @InjectMocks
     private MessageController controller;
@@ -114,6 +118,7 @@ class MessageControllerTest {
                 .content("hello")
                 .build();
         when(repository.findById(message.getId())).thenReturn(Optional.of(message));
+        when(principal.getName()).thenReturn(owner.toString());
 
         assertThatThrownBy(() -> controller.updateMessage(
                 requestChannel,
@@ -133,6 +138,7 @@ class MessageControllerTest {
         UUID messageId = UUID.randomUUID();
         UUID channelId = UUID.randomUUID();
         when(repository.findById(messageId)).thenReturn(Optional.empty());
+        when(principal.getName()).thenReturn(UUID.randomUUID().toString());
 
         assertThatThrownBy(() -> controller.updateMessage(
                 channelId,
