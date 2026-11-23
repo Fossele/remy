@@ -11,3 +11,10 @@ spring:
     hikari:
       maximum-pool-size: 10
       minimum-idle: 10
+
+app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:change-this-development-secret-key-please}
+      access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
+      refresh-token-ttl: ${JWT_REFRESH_TOKEN_TTL:30d}

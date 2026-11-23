@@ -14,7 +14,7 @@ import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.server.ResponseStatusException;
 
-
+import java.security.Principal;
 import java.util.UUID;
 
 @Controller
@@ -25,17 +25,24 @@ public class MessageController {
 
     @MessageMapping("/chat.updateMessage/{channelId}")
     @SendTo("/topic/channel.{channelId}")
-     public ChatMessageResponse updateMessage(@DestinationVariable UUID channelId, @Payload MessageEvent event){
+     public ChatMessageResponse updateMessage(@DestinationVariable UUID channelId,
+                                              @Payload MessageEvent event,
+                                              Principal principal){
          ChatMessage chatMessage = chatMessageRepository.findById(event.messageId()).orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found"));
+         authorizeMessageMutation(chatMessage, channelId, principal);
          chatMessage.setContent(event.content());
+         chatMessage.setEdited(true);
          chatMessageRepository.save(chatMessage);
          return ChatMessageResponse.fromEntity(chatMessage);
      }
 
     @MessageMapping("/chat.deleteMessage/{channelId}")
     @SendTo("/topic/channel.{channelId}")
-    public ChatMessageResponse deleteMessage(@DestinationVariable UUID channelId, @Payload MessageEvent event){
+    public ChatMessageResponse deleteMessage(@DestinationVariable UUID channelId,
+                                              @Payload MessageEvent event,
+                                              Principal principal){
         ChatMessage chatMessage = chatMessageRepository.findById(event.messageId()).orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND, "Not found"));
+        authorizeMessageMutation(chatMessage, channelId, principal);
         chatMessage.setDeleted(true);
         chatMessageRepository.save(chatMessage);
         return ChatMessageResponse.fromEntity(chatMessage);
@@ -44,11 +51,13 @@ public class MessageController {
 
     @MessageMapping("/chat.sendMessage/{channelId}")
     @SendTo("/topic/channel.{channelId}")
-    public ChatMessageResponse sendMessage(@DestinationVariable UUID channelId, @Payload MessageEvent event){
+    public ChatMessageResponse sendMessage(@DestinationVariable UUID channelId,
+                                            @Payload MessageEvent event,
+                                            Principal principal){
          ChatMessage chatMessage = ChatMessage.builder()
                  .content(event.content())
                  .channelId(channelId)
-                 .senderId(event.senderId())
+                 .senderId(currentUserId(principal))
                  .build();
         chatMessageRepository.save(chatMessage);
         return ChatMessageResponse.fromEntity(chatMessage);
@@ -65,5 +74,19 @@ public class MessageController {
         return payload;
     }
 
+    private void authorizeMessageMutation(ChatMessage message, UUID channelId, Principal principal) {
+        if (!channelId.equals(message.getChannelId())
+                || !currentUserId(principal).equals(message.getSenderId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot modify this message");
+        }
+    }
+
+    private UUID currentUserId(Principal principal) {
+        try {
+            return UUID.fromString(principal.getName());
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid authenticated user");
+        }
+    }
 
 }

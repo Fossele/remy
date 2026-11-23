@@ -19,7 +19,6 @@ public record MessageEvent(
 
     // Compact Constructor handles fallback when null is passed
     public MessageEvent {
-        Objects.requireNonNull(senderId, "senderId cannot be null");
         Objects.requireNonNull(channelId, "channelId cannot be null");
         Objects.requireNonNull(mutationType, "mutationType cannot be null");
 

@@ -32,6 +32,9 @@ public class User {
     @Column(name = "email", nullable = false, unique = true, length = 100)
     private String email;
 
+    @Column(name = "password_hash", nullable = false)
+    private String passwordHash;
+
     @Column(name = "display_name", length = 100)
     private String displayName;
 
@@ -49,4 +52,9 @@ public class User {
     @Builder.Default
     @Column(name = "is_deleted", nullable = false)
     private boolean deleted = false;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private UserRole role = UserRole.USER;
 }

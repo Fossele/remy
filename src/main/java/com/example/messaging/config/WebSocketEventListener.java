@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
@@ -33,9 +35,17 @@ public class WebSocketEventListener {
     @EventListener
     public void onDisconnect(SessionDisconnectEvent event) {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
-        String username = (String) accessor.getSessionAttributes().get("username");
-        if (username == null) {
+        java.security.Principal principal = accessor.getUser();
+        if (principal == null) {
             return;
+        }
+        String username = principal.getName();
+        Authentication authentication = principal instanceof Authentication candidate ? candidate : null;
+        if (authentication instanceof JwtAuthenticationToken jwtAuthentication) {
+            String tokenUsername = jwtAuthentication.getToken().getClaimAsString("username");
+            if (tokenUsername != null) {
+                username = tokenUsername;
+            }
         }
         logger.info("{} disconnected", username);
         messaging.convertAndSend("/topic/public",
