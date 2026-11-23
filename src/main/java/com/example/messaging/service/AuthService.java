@@ -3,6 +3,8 @@ package com.example.messaging.service;
 import com.example.messaging.dto.*;
 import com.example.messaging.entity.RefreshToken;
 import com.example.messaging.entity.User;
+import com.example.messaging.entity.AuditAction;
+import com.example.messaging.entity.AuditOutcome;
 import com.example.messaging.repository.RefreshTokenRepository;
 import com.example.messaging.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +13,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -23,6 +26,7 @@ import java.util.HexFormat;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -30,8 +34,9 @@ public class AuthService {
     private final UserService userService;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final AuditService auditService;
 
-    @Value("${app.security.jwt.refresh-token-ttl:30d}")
+    @Value("${app.security.jwt.refresh-token-ttl}")
     private Duration refreshTokenTtl;
 
     private final SecureRandom secureRandom = new SecureRandom();
@@ -40,20 +45,35 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         UserResponse userResponse = userService.register(request);
         User user = userRepository.findById(userResponse.id()).orElseThrow();
-        return createAuthResponse(user);
+        AuthResponse response = createAuthResponse(user);
+        auditService.record(user.getId(), AuditAction.USER_REGISTERED, AuditOutcome.SUCCESS,
+                "USER", user.getId(), null, "User registered");
+        log.info("User registered userId={}", user.getId());
+        return response;
     }
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                UsernamePasswordAuthenticationToken.unauthenticated(
-                        request.username(), request.password()
-                )
-        );
-        User user = userRepository.findByUsername(request.username())
-                .filter(candidate -> !candidate.isDeleted())
-                .orElseThrow();
-        return createAuthResponse(user);
+        try {
+            authenticationManager.authenticate(
+                    UsernamePasswordAuthenticationToken.unauthenticated(
+                            request.username(), request.password()
+                    )
+            );
+            User user = userRepository.findByUsername(request.username())
+                    .filter(candidate -> !candidate.isDeleted())
+                    .orElseThrow();
+            AuthResponse response = createAuthResponse(user);
+            auditService.record(user.getId(), AuditAction.USER_LOGIN_SUCCEEDED, AuditOutcome.SUCCESS,
+                    "USER", user.getId(), null, "Login succeeded");
+            log.info("User login succeeded userId={}", user.getId());
+            return response;
+        } catch (RuntimeException exception) {
+            auditService.record(null, AuditAction.USER_LOGIN_FAILED, AuditOutcome.FAILURE,
+                    "USER", null, null, "Login failed");
+            log.warn("User login failed username={}", request.username());
+            throw exception;
+        }
     }
 
     @Transactional
@@ -67,6 +87,9 @@ public class AuthService {
                 .filter(candidate -> !candidate.isDeleted())
                 .orElseThrow(() -> new IllegalArgumentException("User is unavailable"));
 
+        auditService.record(user.getId(), AuditAction.ACCESS_TOKEN_REFRESHED, AuditOutcome.SUCCESS,
+                "USER", user.getId(), null, "Access token refreshed");
+        log.info("Access token refreshed userId={}", user.getId());
         return new AuthResponse(
                 jwtService.createAccessToken(user),
                 request.refreshToken(),
@@ -81,6 +104,9 @@ public class AuthService {
                 .ifPresent(token -> {
                     token.setRevoked(true);
                     refreshTokenRepository.save(token);
+                    auditService.record(token.getUserId(), AuditAction.USER_LOGOUT, AuditOutcome.SUCCESS,
+                            "USER", token.getUserId(), null, "Refresh token revoked");
+                    log.info("User logout succeeded userId={}", token.getUserId());
                 });
     }
 

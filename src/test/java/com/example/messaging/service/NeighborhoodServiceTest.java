@@ -32,6 +32,8 @@ class NeighborhoodServiceTest {
     private ChannelRepository channelRepository;
     @Mock
     private MessageReportRepository reportRepository;
+    @Mock
+    private AuditService auditService;
 
     @InjectMocks
     private NeighborhoodService service;

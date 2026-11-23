@@ -18,13 +18,19 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Principal;
 import java.util.UUID;
+import com.example.messaging.entity.AuditAction;
+import com.example.messaging.entity.AuditOutcome;
+import com.example.messaging.service.AuditService;
+import lombok.extern.slf4j.Slf4j;
 
 @Controller
 @RequiredArgsConstructor
+@Slf4j
 public class MessageController {
 
     private final ChatMessageRepository chatMessageRepository;
     private final NeighborhoodService neighborhoodService;
+    private final AuditService auditService;
 
     @MessageMapping("/chat.updateMessage/{channelId}")
     @SendTo("/topic/channel.{channelId}")
@@ -38,6 +44,10 @@ public class MessageController {
          chatMessage.setContent(event.content());
          chatMessage.setEdited(true);
          ChatMessage savedMessage = chatMessageRepository.save(chatMessage);
+         auditService.record(userId, AuditAction.MESSAGE_EDITED, AuditOutcome.SUCCESS,
+                 "MESSAGE", savedMessage.getId(), null, "Message edited");
+         log.info("Message edited channelId={} messageId={} actorId={}",
+                 channelId, savedMessage.getId(), userId);
          return ChatMessageResponse.fromEntity(savedMessage);
      }
 
@@ -52,6 +62,10 @@ public class MessageController {
         authorizeMessageMutation(chatMessage, channelId, principal);
         chatMessage.setDeleted(true);
         chatMessageRepository.save(chatMessage);
+        auditService.record(userId, AuditAction.MESSAGE_DELETED, AuditOutcome.SUCCESS,
+                "MESSAGE", chatMessage.getId(), null, "Message deleted");
+        log.info("Message deleted channelId={} messageId={} actorId={}",
+                channelId, chatMessage.getId(), userId);
         return ChatMessageResponse.fromEntity(chatMessage);
     }
 
@@ -68,7 +82,11 @@ public class MessageController {
                  .channelId(channelId)
                  .senderId(userId)
                  .build();
-        chatMessageRepository.save(chatMessage);
+        ChatMessage savedMessage = chatMessageRepository.save(chatMessage);
+        auditService.record(userId, AuditAction.MESSAGE_SENT, AuditOutcome.SUCCESS,
+                "MESSAGE", savedMessage.getId(), null, "Message sent");
+        log.info("Message sent channelId={} messageId={} actorId={}",
+                channelId, savedMessage.getId(), userId);
         return ChatMessageResponse.fromEntity(chatMessage);
     }
 

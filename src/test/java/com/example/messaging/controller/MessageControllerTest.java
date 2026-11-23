@@ -4,6 +4,7 @@ import com.example.messaging.dto.MessageEvent;
 import com.example.messaging.entity.ChatMessage;
 import com.example.messaging.repository.ChatMessageRepository;
 import com.example.messaging.service.NeighborhoodService;
+import com.example.messaging.service.AuditService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -32,6 +33,9 @@ class MessageControllerTest {
 
     @Mock
     private NeighborhoodService neighborhoodService;
+
+    @Mock
+    private AuditService auditService;
 
     @InjectMocks
     private MessageController controller;
