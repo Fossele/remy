@@ -76,4 +76,92 @@ class MessageControllerTest {
 
         verify(repository, never()).save(any());
     }
+
+    @Test
+    void deleteMarksOwnedMessageDeleted() {
+        UUID owner = UUID.randomUUID();
+        UUID channelId = UUID.randomUUID();
+        ChatMessage message = ChatMessage.builder()
+                .id(UUID.randomUUID())
+                .channelId(channelId)
+                .senderId(owner)
+                .content("hello")
+                .build();
+        when(repository.findById(message.getId())).thenReturn(Optional.of(message));
+        when(principal.getName()).thenReturn(owner.toString());
+
+        com.example.messaging.dto.ChatMessageResponse response = controller.deleteMessage(
+                channelId,
+                new MessageEvent(message.getId(), channelId, owner, MessageEvent.MutationType.DELETE,
+                        null, false, true, null),
+                principal
+        );
+
+        assertThat(message.isDeleted()).isTrue();
+        assertThat(response.deleted()).isTrue();
+        verify(repository).save(message);
+    }
+
+    @Test
+    void updateRejectsMessageFromAnotherChannel() {
+        UUID owner = UUID.randomUUID();
+        UUID messageChannel = UUID.randomUUID();
+        UUID requestChannel = UUID.randomUUID();
+        ChatMessage message = ChatMessage.builder()
+                .id(UUID.randomUUID())
+                .channelId(messageChannel)
+                .senderId(owner)
+                .content("hello")
+                .build();
+        when(repository.findById(message.getId())).thenReturn(Optional.of(message));
+
+        assertThatThrownBy(() -> controller.updateMessage(
+                requestChannel,
+                new MessageEvent(message.getId(), requestChannel, owner, MessageEvent.MutationType.EDIT,
+                        "changed", true, false, null),
+                principal
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(exception -> ((ResponseStatusException) exception).getStatusCode().value())
+                .isEqualTo(403);
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void updateRejectsUnknownMessage() {
+        UUID messageId = UUID.randomUUID();
+        UUID channelId = UUID.randomUUID();
+        when(repository.findById(messageId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> controller.updateMessage(
+                channelId,
+                new MessageEvent(messageId, channelId, UUID.randomUUID(), MessageEvent.MutationType.EDIT,
+                        "changed", true, false, null),
+                principal
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(exception -> ((ResponseStatusException) exception).getStatusCode().value())
+                .isEqualTo(404);
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void invalidPrincipalIsRejectedAsUnauthorized() {
+        UUID channelId = UUID.randomUUID();
+        when(principal.getName()).thenReturn("not-a-uuid");
+
+        assertThatThrownBy(() -> controller.sendMessage(
+                channelId,
+                new MessageEvent(null, channelId, null, MessageEvent.MutationType.CREATE,
+                        "hello", false, false, null),
+                principal
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(exception -> ((ResponseStatusException) exception).getStatusCode().value())
+                .isEqualTo(401);
+
+        verify(repository, never()).save(any());
+    }
 }

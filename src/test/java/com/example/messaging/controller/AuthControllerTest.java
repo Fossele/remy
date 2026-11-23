@@ -68,6 +68,40 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void loginReturnsAuthResponse() throws Exception {
+        when(authService.login(any(com.example.messaging.dto.LoginRequest.class)))
+                .thenReturn(authResponse());
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "alice",
+                                  "password": "password123"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("access-token"));
+    }
+
+    @Test
+    void refreshAndLogoutEndpointsReturnExpectedStatuses() throws Exception {
+        when(authService.refresh(any(com.example.messaging.dto.RefreshTokenRequest.class)))
+                .thenReturn(authResponse());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"refresh-token\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token"));
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"refresh-token\"}"))
+                .andExpect(status().isNoContent());
+    }
+
     private AuthResponse authResponse() {
         return new AuthResponse(
                 "access-token",

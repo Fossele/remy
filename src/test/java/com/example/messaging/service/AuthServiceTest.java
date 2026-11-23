@@ -95,6 +95,67 @@ class AuthServiceTest {
         verify(refreshTokenRepository).save(token);
     }
 
+    @Test
+    void loginRejectsDeletedUser() {
+        User deletedUser = user("alice");
+        deletedUser.setDeleted(true);
+        when(userRepository.findByUsername("alice")).thenReturn(Optional.of(deletedUser));
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("alice", "password123")))
+                .isInstanceOf(java.util.NoSuchElementException.class);
+    }
+
+    @Test
+    void refreshCreatesAccessTokenForValidStoredToken() {
+        UUID userId = UUID.randomUUID();
+        User user = user("alice");
+        user.setId(userId);
+        RefreshToken token = RefreshToken.builder()
+                .userId(userId)
+                .expiresAt(Instant.now().plusSeconds(60))
+                .revoked(false)
+                .build();
+        when(refreshTokenRepository.findByTokenHashAndRevokedFalse(anyString()))
+                .thenReturn(Optional.of(token));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(jwtService.createAccessToken(user)).thenReturn("access-token");
+        when(jwtService.accessTokenExpiresInSeconds()).thenReturn(900L);
+
+        AuthResponse response = authService.refresh(new RefreshTokenRequest("refresh-token"));
+
+        assertThat(response.accessToken()).isEqualTo("access-token");
+        assertThat(response.refreshToken()).isEqualTo("refresh-token");
+        assertThat(response.user().username()).isEqualTo("alice");
+    }
+
+    @Test
+    void refreshRejectsUnavailableUser() {
+        UUID userId = UUID.randomUUID();
+        RefreshToken token = RefreshToken.builder()
+                .userId(userId)
+                .expiresAt(Instant.now().plusSeconds(60))
+                .revoked(false)
+                .build();
+        when(refreshTokenRepository.findByTokenHashAndRevokedFalse(anyString()))
+                .thenReturn(Optional.of(token));
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest("refresh-token")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("User is unavailable");
+        verifyNoInteractions(jwtService);
+    }
+
+    @Test
+    void logoutIgnoresUnknownRefreshToken() {
+        when(refreshTokenRepository.findByTokenHashAndRevokedFalse(anyString()))
+                .thenReturn(Optional.empty());
+
+        authService.logout(new RefreshTokenRequest("unknown"));
+
+        verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
+    }
+
     private User user(String username) {
         return User.builder()
                 .id(UUID.randomUUID())
