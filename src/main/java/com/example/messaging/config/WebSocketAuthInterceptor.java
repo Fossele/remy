@@ -5,6 +5,7 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -39,6 +40,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                     .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
                     .toList();
             accessor.setUser(new JwtAuthenticationToken(jwt, authorities, jwt.getSubject()));
+            return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
         }
 
         return message;
