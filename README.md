@@ -388,6 +388,63 @@ Send, edit, and delete operations require:
 
 See [`docs/frontend-integration.md`](docs/frontend-integration.md) for REST and JavaScript examples, including authentication storage, neighborhood joining, channel creation, message reporting, history requests, and STOMP subscriptions.
 
+## Community project funds
+
+Verified neighborhood members can contribute to active project funds through Fapshi's hosted checkout. Fund balances are derived from an append-only ledger and include the net amount Fapshi reports after fees. A contribution is credited only after its payment is confirmed by Fapshi's status API or verified webhook.
+
+Create a fund as a neighborhood moderator or administrator:
+
+```http
+POST /api/neighborhoods/{neighborhoodId}/funds
+Authorization: Bearer ACCESS_TOKEN
+Content-Type: application/json
+```
+
+```json
+{
+  "name": "Road repair",
+  "description": "Gravel and drainage work",
+  "targetAmount": 500000
+}
+```
+
+Contribute to a fund as a verified member:
+
+```http
+POST /api/neighborhoods/{neighborhoodId}/funds/{fundId}/contributions
+Authorization: Bearer ACCESS_TOKEN
+Content-Type: application/json
+```
+
+```json
+{
+  "amount": 5000
+}
+```
+
+The response contains a `paymentLink` for Fapshi checkout. Amounts are integer XAF and the minimum contribution is 100 XAF.
+
+A verified member can request a withdrawal with a beneficiary name and Cameroon mobile number. The request reserves the amount while pending. Every verified neighborhood administrator must approve it; any rejection ends the request. The admin roster is captured when the request is made, and a roster change cancels the request.
+
+After unanimous approval, a listed administrator can initiate a Fapshi payout from the app. The app checks the payout-service balance, initiates the payout, and debits the fund only after Fapshi confirms success. Payouts are limited to 100–500,000 XAF per request; larger withdrawals can be paid externally and recorded with a receipt.
+
+Fapshi collection and payout services have separate credentials and balances. Funds collected by the collection service do not automatically appear in the payout service; transfer/top-up between them through the Fapshi dashboard or app. Live payouts require sandbox testing and approval from Fapshi support.
+
+Configure Fapshi for sandbox testing with:
+
+```bash
+export FAPSHI_BASE_URL=https://sandbox.fapshi.com
+export FAPSHI_COLLECTION_API_USER='your-collection-api-user'
+export FAPSHI_COLLECTION_API_KEY='your-collection-api-key'
+export FAPSHI_PAYOUT_API_USER='your-payout-api-user'
+export FAPSHI_PAYOUT_API_KEY='your-payout-api-key'
+export FAPSHI_WEBHOOK_SECRET='your-webhook-secret'
+export FAPSHI_WEBHOOK_URL='https://your-public-host/api/webhooks/fapshi'
+export FAPSHI_REDIRECT_URL='https://your-frontend.example/payment-return'
+```
+
+Keep credentials out of source control. The sandbox base URL is the default; use the live URL only after the Fapshi account is configured for production. See [`docs/fapshi_api_integration_guide_for_ai_agents.md`](docs/fapshi_api_integration_guide_for_ai_agents.md) for provider constraints.
+
 ## Docker
 
 Build:

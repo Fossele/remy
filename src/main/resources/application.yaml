@@ -18,6 +18,17 @@ app:
       secret: ${JWT_SECRET:secret-key}
       access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
       refresh-token-ttl: ${JWT_REFRESH_TOKEN_TTL:30d}
+  fapshi:
+    base-url: ${FAPSHI_BASE_URL:https://sandbox.fapshi.com}
+    collection-api-user: ${FAPSHI_COLLECTION_API_USER:}
+    collection-api-key: ${FAPSHI_COLLECTION_API_KEY:}
+    payout-api-user: ${FAPSHI_PAYOUT_API_USER:}
+    payout-api-key: ${FAPSHI_PAYOUT_API_KEY:}
+    webhook-secret: ${FAPSHI_WEBHOOK_SECRET:}
+    webhook-url: ${FAPSHI_WEBHOOK_URL:}
+    redirect-url: ${FAPSHI_REDIRECT_URL:}
+  finance:
+    reconciliation-delay-ms: ${FINANCE_RECONCILIATION_DELAY_MS:300000}
 
 logging:
   pattern:

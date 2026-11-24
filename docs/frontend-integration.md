@@ -182,6 +182,140 @@ await api(
 );
 ```
 
+## Community project funds
+
+Only verified neighborhood members can view funds, contribute, or request a withdrawal. Verified moderators or administrators can create funds. All amounts are integer XAF.
+
+### Create and list project funds
+
+```js
+const fund = await api(`/api/neighborhoods/${neighborhoodId}/funds`, {
+  method: "POST",
+  token,
+  body: {
+    name: "Road repair",
+    description: "Gravel and drainage work",
+    targetAmount: 500000
+  }
+});
+
+const funds = await api(`/api/neighborhoods/${neighborhoodId}/funds`, { token });
+```
+
+`targetAmount` is optional. Fund responses include `contributedAmount`, `availableAmount`, and `reservedAmount`. `contributedAmount` is the gross amount members paid; `availableAmount` reflects confirmed net Fapshi revenue less paid withdrawals and reserved requests.
+
+### Contribute through Fapshi
+
+```js
+const contribution = await api(
+  `/api/neighborhoods/${neighborhoodId}/funds/${fund.id}/contributions`,
+  {
+    method: "POST",
+    token,
+    body: { amount: 5000 }
+  }
+);
+
+window.location.assign(contribution.paymentLink);
+```
+
+The minimum contribution is 100 XAF. The response starts with status `PENDING`; the backend changes it after checking Fapshi's payment status or processing its verified webhook. The `netAmount` reflects the amount credited after Fapshi fees. Never collect Fapshi API credentials in the frontend. The backend webhook is `POST /api/webhooks/fapshi` and must be configured with the `x-wh-secret` secret on the server.
+
+### Request a withdrawal
+
+A verified member can request a withdrawal from available funds:
+
+```js
+const withdrawal = await api(
+  `/api/neighborhoods/${neighborhoodId}/funds/${fund.id}/withdrawals`,
+  {
+    method: "POST",
+    token,
+    body: {
+      amount: 25000,
+      purpose: "Gravel delivery for road repair",
+      beneficiaryName: "Roadworks contractor",
+      beneficiaryPhone: "670000000",
+      beneficiaryMedium: "mobile money"
+    }
+  }
+);
+```
+
+The phone must be a 9-digit Cameroon mobile number without `+237`. `beneficiaryMedium` is optional and may be `"mobile money"` or `"orange money"`. The amount is reserved while the request is pending. Every verified neighborhood administrator captured when the request is created must approve it; one rejection rejects the request. Moderators who are not administrators do not count as approvers.
+
+Administrators submit their decision individually:
+
+```js
+const decision = await api(
+  `/api/neighborhoods/${neighborhoodId}/funds/${fund.id}/withdrawals/${withdrawal.id}/approvals`,
+  {
+    method: "POST",
+    token,
+    body: { approved: true }
+  }
+);
+```
+
+The response includes `requiredApprovals`, `approvalsReceived`, and the current `status`. A changed verified-admin roster cancels the request when it is next approved, completed, or paid out. Verified members can list requests with:
+
+```js
+const withdrawals = await api(
+  `/api/neighborhoods/${neighborhoodId}/funds/${fund.id}/withdrawals`,
+  { token }
+);
+```
+
+The full beneficiary phone is visible only to verified administrators included in the approval list; other members see a masked number. Listed administrators can retrieve payout details before approving:
+
+```js
+const payoutDetails = await api(
+  `/api/neighborhoods/${neighborhoodId}/funds/${fund.id}/withdrawals/${withdrawal.id}/payout-details`,
+  { token }
+);
+```
+
+### Initiate a Fapshi payout
+
+After unanimous approval, a listed verified administrator can initiate the payout. The server checks the Fapshi payout-service balance before calling Fapshi:
+
+```js
+const payout = await api(
+  `/api/neighborhoods/${neighborhoodId}/funds/${fund.id}/withdrawals/${withdrawal.id}/payouts`,
+  { method: "POST", token }
+);
+```
+
+Fapshi payouts are 100–500,000 XAF per request. Status `PAYOUT_PENDING` means Fapshi accepted the request but it is not settled; `PAYOUT_INITIATING` means the API outcome is being reconciled. Poll the individual withdrawal endpoint:
+
+```js
+const currentWithdrawal = await api(
+  `/api/neighborhoods/${neighborhoodId}/funds/${fund.id}/withdrawals/${withdrawal.id}`,
+  { token }
+);
+```
+
+The backend also updates payout status from Fapshi webhooks and periodic reconciliation. A failed payout returns the withdrawal to `APPROVED`, allowing an administrator to retry. The ledger debit is recorded only after Fapshi confirms success, when the withdrawal becomes `PAID`.
+
+Fapshi collection and payout services use separate balances and credentials. Contributions collected through Fapshi do not automatically fund payouts; top up/transfer the payout-service balance using the Fapshi dashboard or app. Live payouts require sandbox testing and Fapshi support approval.
+
+### Record an external/manual withdrawal
+
+For withdrawals over Fapshi's per-request limit or when paying outside Fapshi, an administrator can pay externally and record the receipt/reference:
+
+```js
+const completed = await api(
+  `/api/neighborhoods/${neighborhoodId}/funds/${fund.id}/withdrawals/${withdrawal.id}/complete`,
+  {
+    method: "POST",
+    token,
+    body: { receiptReference: "transfer-reference-or-receipt-id" }
+  }
+);
+```
+
+This marks the withdrawal `MANUALLY_PAID` and records a debit in the ledger. The receipt reference is recorded for audit but the app does not verify the external transfer.
+
 ## Channels
 
 ### Create a channel
