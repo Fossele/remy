@@ -15,7 +15,6 @@ services:
       retries: 10
 
   app:
-    image: remy
     build: .
     ports:
       - "8080:8080"

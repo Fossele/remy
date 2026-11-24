@@ -17,7 +17,7 @@ public class JwtService {
 
     private final JwtEncoder jwtEncoder;
 
-    @Value("${app.security.jwt.access-token-ttl:15m}")
+    @Value("${app.security.jwt.access-token-ttl}")
     private Duration accessTokenTtl;
 
     public String createAccessToken(User user) {
